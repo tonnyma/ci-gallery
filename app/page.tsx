@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 
 
 const Gallery = () => {
-  const [portfolios, setPortfolios] = useState([]);
+  const [portfolios, setPortfolios] = useState<{ id: number; name: string; url: string }[]>([]);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [email, setEmail] = useState(''); // State for email
