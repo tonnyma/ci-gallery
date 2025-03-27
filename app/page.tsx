@@ -1,127 +1,176 @@
-'use client';
-import { useState, useEffect } from 'react';
+"use client";
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation'; // Import useRouter
+import { useSession } from '@supabase/auth-helpers/react'; // Import useSession if needed
 
-export default function DesignerGallery() {
-  const [portfolios, setPortfolios] = useState<
-    { id: number; name: string; url: string }[]
-  >([]);
+const Gallery = () => {
+  const [portfolios, setPortfolios] = useState([]);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
-  const [zoomLevels, setZoomLevels] = useState<{ [key: number]: number }>({});
+  const [email, setEmail] = useState(''); // State for email
+  const [password, setPassword] = useState(''); // State for password
+  const [loggedIn, setLoggedIn] = useState(false); // State for login status
 
-  useEffect(() => {
-    const stored = localStorage.getItem('portfolios');
-    if (stored) {
-      try {
-        setPortfolios(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to parse stored portfolios', e);
-      }
+  const fetchPortfolios = async () => {
+    const { data, error } = await supabase.from('portfolios').select('*');
+    if (error) {
+      console.error(error);
+    } else {
+      setPortfolios(data);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    localStorage.setItem('portfolios', JSON.stringify(portfolios));
-  }, [portfolios]);
+    if (loggedIn) fetchPortfolios();
+  }, [loggedIn]);
 
-  const addPortfolio = () => {
-    if (!url || !name) return;
-    setPortfolios((prev) => [
-      ...prev,
-      { id: Date.now(), name, url }
-    ]);
-    setName('');
-    setUrl('');
+  const handleLogin = async (e) => { // Function to handle login
+    e.preventDefault();
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Login error:', error);
+    } else {
+      setLoggedIn(true);
+    }
   };
 
-  const removePortfolio = (id: number) => {
-    setPortfolios((prev) => prev.filter((p) => p.id !== id));
-  };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const { data, error } = await supabase
+      .from('portfolios')
+      .insert([{ name, url }])
+      .select()
+      .single();
 
-  const columnCount = Math.min(portfolios.length, 4);
-  const gridTemplateColumns = `repeat(${columnCount}, minmax(0, 1fr))`;
+    if (error) {
+      console.error(error);
+    } else {
+      setPortfolios([...portfolios, data]);
+      setName('');
+      setUrl('');
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-white p-0">
-      <div className="flex flex-col sm:flex-row gap-2 mb-0">
-        <input
-          type="text"
-          placeholder="Designer Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="border border-gray-300 rounded px-3 py-2 flex-1"
-        />
-        <input
-          type="text"
-          placeholder="Portfolio URL"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          className="border border-gray-300 rounded px-3 py-2 flex-1"
-        />
-        <button
-          onClick={addPortfolio}
-          className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
-        >
-          Add
-        </button>
-      </div>
-
-      <div
-        className="grid gap-0 auto-rows-[500px] m-0 p-0"
-        style={{ gridTemplateColumns }}
-      >
-        {portfolios.map((p) => (
-          <div
-            key={p.id}
-            className="relative group w-full h-full overflow-hidden"
-          >
-            <iframe
-              src={p.url}
-              title={p.name}
-              className="w-full h-full border-none"
-              style={{
-                transform: `scale(${zoomLevels[p.id] || 1})`,
-                transformOrigin: 'top left',
-                width: `${100 / (zoomLevels[p.id] || 1)}%`,
-                height: `${100 / (zoomLevels[p.id] || 1)}%`
-              }}
+    <>
+      {!loggedIn ? (
+        <div className="flex items-center justify-center h-screen">
+          <form onSubmit={handleLogin} className="flex flex-col gap-4 w-80">
+            <input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className="border border-gray-300 px-3 py-2 rounded"
             />
-            <div className="absolute top-2 left-2 flex gap-1">
-              <button
-                onClick={() =>
-                  setZoomLevels((prev) => ({
-                    ...prev,
-                    [p.id]: (prev[p.id] || 1) + 0.1
-                  }))
-                }
-                className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200"
-              >
-                +
-              </button>
-              <button
-                onClick={() =>
-                  setZoomLevels((prev) => ({
-                    ...prev,
-                    [p.id]: Math.max(0.1, (prev[p.id] || 1) - 0.1)
-                  }))
-                }
-                className="bg-white text-black text-xs px-2 py-1 rounded hover:bg-gray-200"
-              >
-                −
-              </button>
-            </div>
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              className="border border-gray-300 px-3 py-2 rounded"
+            />
             <button
-              onClick={() => removePortfolio(p.id)}
-              className="absolute top-2 right-2 bg-black text-white text-xs rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-500"
+              type="submit"
+              className="bg-black text-white px-4 py-2 rounded"
             >
-              ×
+              Login
             </button>
-            <div className="absolute bottom-0 left-0 w-full bg-black bg-opacity-60 text-white text-sm text-center py-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              {p.name}
+          </form>
+        </div>
+      ) : (
+        <div className="p-4">
+          <form onSubmit={handleSubmit}>
+            <div className="flex gap-2 items-center mb-4">
+              <input
+                type="text"
+                placeholder="Designer Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="border border-gray-300 px-2 py-1 rounded w-1/4"
+                required
+              />
+              <input
+                type="url"
+                placeholder="Portfolio URL"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                className="border border-gray-300 px-2 py-1 rounded w-1/2"
+                required
+              />
+              <button
+                type="submit"
+                className="bg-black text-white px-4 py-2 rounded"
+              >
+                Add
+              </button>
             </div>
+          </form>
+          <div className="portfolio-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full">
+            {portfolios.map((portfolio) => (
+              <div
+                key={portfolio.id}
+                className="portfolio-item relative min-w-[300px] bg-white rounded overflow-hidden shadow flex flex-col"
+              >
+                <div className="absolute top-2 right-2 z-10 flex gap-1">
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const { error } = await supabase.from('portfolios').delete().eq('id', portfolio.id);
+                      if (!error) {
+                        setPortfolios(prev => prev.filter(p => p.id !== portfolio.id));
+                      } else {
+                        console.error('Error deleting portfolio:', error);
+                      }
+                    }}
+                    className="bg-black text-white rounded-full w-6 h-6 text-xs flex items-center justify-center"
+                  >
+                    ×
+                  </button>
+                  <button
+                    onClick={() => {
+                      const iframe = document.getElementById(`iframe-${portfolio.id}`);
+                      if (iframe) iframe.style.transform = 'scale(1.1)';
+                    }}
+                    className="bg-gray-200 text-black rounded-full w-6 h-6 text-xs flex items-center justify-center"
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => {
+                      const iframe = document.getElementById(`iframe-${portfolio.id}`);
+                      if (iframe) iframe.style.transform = 'scale(0.9)';
+                    }}
+                    className="bg-gray-200 text-black rounded-full w-6 h-6 text-xs flex items-center justify-center"
+                  >
+                    -
+                  </button>
+                </div>
+                <div className="overflow-auto h-[300px]">
+                  <iframe
+                    id={`iframe-${portfolio.id}`}
+                    src={portfolio.url}
+                    title={portfolio.name}
+                    className="w-full h-full transition-transform duration-300"
+                  />
+                </div>
+                <div className="bg-black text-white text-sm p-2 text-center">
+                  {portfolio.name}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
-}
+};
+
+export default Gallery;
