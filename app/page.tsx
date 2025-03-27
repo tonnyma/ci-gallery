@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation'; // Import useRouter
-import { useSession } from '@supabase/auth-helpers/react'; // Import useSession if needed
+
 
 const Gallery = () => {
   const [portfolios, setPortfolios] = useState([]);
