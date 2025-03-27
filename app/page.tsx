@@ -24,7 +24,7 @@ const Gallery = () => {
     if (loggedIn) fetchPortfolios();
   }, [loggedIn]);
 
-  const handleLogin = async (e) => { // Function to handle login
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => { // Function to handle login
     e.preventDefault();
     const { error } = await supabase.auth.signInWithPassword({
       email,
