@@ -79,15 +79,13 @@ const Gallery = () => {
   // Handle adding a new portfolio
   const handleAddPortfolio = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('portfolios')
       .insert([{ name, url }])
       .select()
       .single();
 
-    if (error) {
-      console.error(error);
-    } else if (data) {
+    if (data) {
       setPortfolios((prev) => [...prev, data]);
       setName('');
       setUrl('');
