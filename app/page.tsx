@@ -69,7 +69,8 @@ const Gallery = () => {
       setShowLoginForm(false);
       triggerSuccessToast('Logged in successfully!');
     } catch (err: unknown) { // Updated type casting
-      const error = err as AuthApiError;
+      // Optionally log the error or remove entirely if not needed
+      console.error(err);
       triggerErrorToast('Incorrect email or password.');
     }
   };
