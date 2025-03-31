@@ -92,12 +92,8 @@ const Gallery = () => {
 
   // Handle deleting a portfolio
   const handleDeletePortfolio = async (id: number) => {
-    const { error } = await supabase.from('portfolios').delete().eq('id', id);
-    if (error) {
-      console.error('Error deleting portfolio:', error);
-    } else {
-      setPortfolios((prev) => prev.filter((p) => p.id !== id));
-    }
+    await supabase.from('portfolios').delete().eq('id', id);
+    setPortfolios((prev) => prev.filter((p) => p.id !== id));
   };
 
   // Render toast messages
