@@ -29,10 +29,8 @@ const Gallery = () => {
 
   // Fetch portfolios from Supabase
   const fetchPortfolios = async () => {
-    const { data, error } = await supabase.from('portfolios').select('*');
-    if (error) {
-      console.error(error);
-    } else if (data) {
+    const { data } = await supabase.from('portfolios').select('*');
+    if (data) {
       setPortfolios(data);
     }
   };
