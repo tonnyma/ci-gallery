@@ -1,44 +1,89 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { AuthApiError } from '@supabase/supabase-js'; // Import the Supabase Auth types
 
+// Define a Portfolio interface for clarity
+interface Portfolio {
+  id: number;
+  name: string;
+  url: string;
+}
 
 const Gallery = () => {
-  const [portfolios, setPortfolios] = useState<{ id: number; name: string; url: string }[]>([]);
+  // Grouped state declarations for portfolios and form inputs
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([]);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
-  const [email, setEmail] = useState(''); // State for email
-  const [password, setPassword] = useState(''); // State for password
-  const [loggedIn, setLoggedIn] = useState(false); // State for login status
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [zoomLevels, setZoomLevels] = useState<Record<number, number>>({});
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [isPublicView, setIsPublicView] = useState(false);
+  const [showLoginForm, setShowLoginForm] = useState(false);
+  const [showToastMessage, setShowToastMessage] = useState<string | null>(null); // Updated state variable
+  const [showErrorToast, setShowErrorToast] = useState<string | false>(false); // Updated state variable
 
+  useEffect(() => {
+    console.log("Toast message:", showErrorToast);
+  }, [showErrorToast]);
+
+  // Fetch portfolios from Supabase
   const fetchPortfolios = async () => {
     const { data, error } = await supabase.from('portfolios').select('*');
     if (error) {
       console.error(error);
-    } else {
+    } else if (data) {
       setPortfolios(data);
     }
   };
 
+  // Fetch portfolios by default unless admin view is explicitly requested
   useEffect(() => {
-    if (loggedIn) fetchPortfolios();
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('admin') !== 'true') {
+      setIsPublicView(true);
+      fetchPortfolios(); // Allow fetch even if not logged in
+    } else if (loggedIn) {
+      fetchPortfolios();
+    }
   }, [loggedIn]);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => { // Function to handle login
-    e.preventDefault();
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  // Reusable toast helpers
+  const triggerSuccessToast = (message: string) => {
+    setShowToastMessage(message);
+    setTimeout(() => setShowToastMessage(null), 3000);
+  };
 
-    if (error) {
-      console.error('Login error:', error);
-    } else {
+  const triggerErrorToast = (message: string) => {
+    setShowErrorToast(message);
+    setTimeout(() => setShowErrorToast(false), 3000);
+  };
+
+  // Handle user login
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
       setLoggedIn(true);
+      setShowLoginForm(false);
+      triggerSuccessToast('Logged in successfully!');
+    } catch (err: unknown) { // Updated type casting
+      const error = err as AuthApiError;
+      triggerErrorToast('Incorrect email or password.');
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  // Handle adding a new portfolio
+  const handleAddPortfolio = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const { data, error } = await supabase
       .from('portfolios')
@@ -48,126 +93,211 @@ const Gallery = () => {
 
     if (error) {
       console.error(error);
-    } else {
-      setPortfolios([...portfolios, data]);
+    } else if (data) {
+      setPortfolios((prev) => [...prev, data]);
       setName('');
       setUrl('');
     }
   };
 
+  // Handle deleting a portfolio
+  const handleDeletePortfolio = async (id: number) => {
+    const { error } = await supabase.from('portfolios').delete().eq('id', id);
+    if (error) {
+      console.error('Error deleting portfolio:', error);
+    } else {
+      setPortfolios((prev) => prev.filter((p) => p.id !== id));
+    }
+  };
+
+  // Render toast messages
+  const renderToastMessages = () => (
+    <>
+      {showToastMessage && (
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded shadow z-50">
+          {showToastMessage}
+        </div>
+      )}
+      {showErrorToast && ( // Updated error toast
+        <div className="fixed top-16 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded shadow z-[9999]">
+          {showErrorToast}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <>
-      {!loggedIn ? (
-        <div className="flex items-center justify-center h-screen">
-          <form onSubmit={handleLogin} className="flex flex-col gap-4 w-80">
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="border border-gray-300 px-3 py-2 rounded"
-            />
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              className="border border-gray-300 px-3 py-2 rounded"
-            />
-            <button
-              type="submit"
-              className="bg-black text-white px-4 py-2 rounded"
+      {showLoginForm && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center backdrop-blur-sm bg-black/10">
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-80">
+            <form
+              onSubmit={handleLogin}
+              className="flex flex-col gap-4"
             >
-              Login
-            </button>
-          </form>
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="border border-gray-300 px-3 py-2 rounded"
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="border border-gray-300 px-3 py-2 rounded"
+              />
+              <div className="flex justify-between gap-2">
+                <button
+                  type="submit"
+                  className="bg-black text-white px-4 py-2 rounded w-full"
+                >
+                  Login
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowLoginForm(false)}
+                  className="bg-gray-300 text-black px-4 py-2 rounded w-full"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      ) : (
-        <div className="p-4">
-          <form onSubmit={handleSubmit}>
-            <div className="flex gap-2 items-center mb-4">
-              <input
-                type="text"
-                placeholder="Designer Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="border border-gray-300 px-2 py-1 rounded w-1/4"
-                required
-              />
-              <input
-                type="url"
-                placeholder="Portfolio URL"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                className="border border-gray-300 px-2 py-1 rounded w-1/2"
-                required
-              />
+      )}
+      <div className="w-full bg-white border-b border-gray-200 py-4 px-6 flex justify-between items-center fixed top-0 left-0 right-0 z-50">
+        <h1 className="text-xl font-semibold">Design Gallery</h1>
+        {loggedIn ? (
+          <button
+            className="bg-gray-200 text-black px-4 py-2 rounded hover:bg-gray-300"
+            onClick={() => {
+              setLoggedIn(false);
+              setIsPublicView(true);
+              triggerSuccessToast('Logged out successfully!');
+            }}
+          >
+            Logout
+          </button>
+        ) : (
+          <button
+            className="bg-black text-white px-4 py-2 rounded hover:bg-gray-900"
+            onClick={() => setShowLoginForm(true)}
+          >
+            Login
+          </button>
+        )}
+      </div>
+      {renderToastMessages()}
+      <div className="h-16" /> {/* Spacer to offset fixed header */}
+      <>
+        {loggedIn && (
+          <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 bg-white/80 backdrop-blur-lg px-6 py-4 rounded-xl shadow-lg w-full max-w-4xl">
+            <form onSubmit={handleAddPortfolio} className="flex gap-2 items-end">
+              <div className="relative w-1/3">
+                <input
+                  type="text"
+                  id="designer-name"
+                  placeholder=" "
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  className="peer w-full border border-gray-300 px-3 pt-5 pb-2 rounded-lg placeholder-transparent focus:outline-none focus:border-black"
+                />
+                <label
+                  htmlFor="designer-name"
+                  className="absolute left-3 top-2 text-gray-500 text-sm transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-2 peer-focus:text-sm peer-focus:text-gray-500"
+                >
+                  Designer Name
+                </label>
+              </div>
+
+              <div className="relative flex-grow">
+                <input
+                  type="url"
+                  id="portfolio-url"
+                  placeholder=" "
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  required
+                  className="peer w-full border border-gray-300 px-3 pt-5 pb-2 rounded-lg placeholder-transparent focus:outline-none focus:border-black"
+                />
+                <label
+                  htmlFor="portfolio-url"
+                  className="absolute left-3 top-2 text-gray-500 text-sm transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-400 peer-focus:top-2 peer-focus:text-sm peer-focus:text-gray-500"
+                >
+                  Portfolio URL
+                </label>
+              </div>
+
               <button
                 type="submit"
-                className="bg-black text-white px-4 py-2 rounded"
+                className="bg-black text-white px-5 py-3 rounded-lg hover:bg-gray-900 transition-all"
               >
                 Add
               </button>
-            </div>
-          </form>
-          <div className="portfolio-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 w-full">
-            {portfolios.map((portfolio) => (
+            </form>
+          </div>
+        )}
+      </>
+      <div>
+        <div className="portfolio-grid grid sm:grid-cols-3 auto-rows-[100vh] snap-y snap-mandatory overflow-y-auto w-full">
+          {portfolios.map((portfolio) => {
+            const zoom = zoomLevels[portfolio.id] ?? 1;
+
+            const updateZoom = (delta: number) => {
+              setZoomLevels(prev => ({
+                ...prev,
+                [portfolio.id]: Math.max(0.1, (prev[portfolio.id] ?? 1) + delta),
+              }));
+            };
+
+            return (
               <div
                 key={portfolio.id}
-                className="portfolio-item relative min-w-[300px] bg-white rounded overflow-hidden shadow flex flex-col"
+              className="portfolio-item snap-start relative bg-white overflow-hidden shadow flex flex-col group transition-transform duration-200 hover:scale-[1.05]"
               >
-                <div className="absolute top-2 right-2 z-10 flex gap-1">
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      const { error } = await supabase.from('portfolios').delete().eq('id', portfolio.id);
-                      if (!error) {
-                        setPortfolios(prev => prev.filter(p => p.id !== portfolio.id));
-                      } else {
-                        console.error('Error deleting portfolio:', error);
-                      }
-                    }}
-                    className="bg-black text-white rounded-full w-6 h-6 text-xs flex items-center justify-center"
-                  >
-                    ×
-                  </button>
-                  <button
-                    onClick={() => {
-                      const iframe = document.getElementById(`iframe-${portfolio.id}`);
-                      if (iframe) iframe.style.transform = 'scale(1.1)';
-                    }}
-                    className="bg-gray-200 text-black rounded-full w-6 h-6 text-xs flex items-center justify-center"
-                  >
-                    +
-                  </button>
-                  <button
-                    onClick={() => {
-                      const iframe = document.getElementById(`iframe-${portfolio.id}`);
-                      if (iframe) iframe.style.transform = 'scale(0.9)';
-                    }}
-                    className="bg-gray-200 text-black rounded-full w-6 h-6 text-xs flex items-center justify-center"
-                  >
-                    -
-                  </button>
+                <div className="absolute top-2 left-2 z-10 flex gap-1">
+                  <button onClick={() => updateZoom(0.1)} className="bg-black text-white rounded-full w-6 h-6 text-xs flex items-center justify-center">+</button>
+                  <button onClick={() => updateZoom(-0.1)} className="bg-black text-white rounded-full w-6 h-6 text-xs flex items-center justify-center">−</button>
                 </div>
-                <div className="overflow-auto h-[300px]">
+                {loggedIn && (
+                  <div className="absolute top-2 right-2 z-10">
+                    <button
+                      onClick={() => handleDeletePortfolio(portfolio.id)}
+                      className="bg-red-600 text-white rounded-full w-6 h-6 text-xs flex items-center justify-center hover:bg-red-700"
+                      title="Delete"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                <div className="overflow-auto h-full">
                   <iframe
                     id={`iframe-${portfolio.id}`}
                     src={portfolio.url}
                     title={portfolio.name}
-                    className="w-full h-full transition-transform duration-300"
+                    className="w-full h-full"
+                    style={{
+                      transform: `scale(${zoom})`,
+                      transformOrigin: '0 0',
+                      width: `${100 / zoom}%`,
+                      height: `${100 / zoom}%`,
+                    }}
                   />
                 </div>
-                <div className="bg-black text-white text-sm p-2 text-center">
+                <div className="absolute bottom-0 left-0 right-0 bg-black/80 text-white text-sm p-2 text-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
                   {portfolio.name}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      )}
+      </div>
     </>
   );
 };
