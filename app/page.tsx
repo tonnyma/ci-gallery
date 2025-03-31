@@ -19,7 +19,6 @@ const Gallery = () => {
   const [password, setPassword] = useState('');
   const [zoomLevels, setZoomLevels] = useState<Record<number, number>>({});
   const [loggedIn, setLoggedIn] = useState(false);
-  const [isPublicView, setIsPublicView] = useState(false);
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showToastMessage, setShowToastMessage] = useState<string | null>(null); // Updated state variable
   const [showErrorToast, setShowErrorToast] = useState<string | false>(false); // Updated state variable
@@ -42,7 +41,6 @@ const Gallery = () => {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('admin') !== 'true') {
-      setIsPublicView(true);
       fetchPortfolios(); // Allow fetch even if not logged in
     } else if (loggedIn) {
       fetchPortfolios();
@@ -64,14 +62,10 @@ const Gallery = () => {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      await supabase.auth.signInWithPassword({
         email,
         password,
       });
-
-      if (error) {
-        throw error;
-      }
 
       setLoggedIn(true);
       setShowLoginForm(false);
@@ -177,7 +171,6 @@ const Gallery = () => {
             className="bg-gray-200 text-black px-4 py-2 rounded hover:bg-gray-300"
             onClick={() => {
               setLoggedIn(false);
-              setIsPublicView(true);
               triggerSuccessToast('Logged out successfully!');
             }}
           >
