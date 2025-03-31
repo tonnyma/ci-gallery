@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { AuthApiError } from '@supabase/supabase-js'; // Import the Supabase Auth types
 
 // Define a Portfolio interface for clarity
 interface Portfolio {
