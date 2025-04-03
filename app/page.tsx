@@ -28,7 +28,6 @@ const Gallery = () => {
   const [showLoginForm, setShowLoginForm] = useState(false);
   const [showToastMessage, setShowToastMessage] = useState<string | null>(null);
   const [showErrorToast, setShowErrorToast] = useState<string | false>(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [iframesLoaded, setIframesLoaded] = useState<{ [key: string]: boolean }>({});
 
   // Add refs for GSAP
@@ -55,7 +54,6 @@ const Gallery = () => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setLoggedIn(!!session);
-      setIsLoading(false);
     };
     
     checkSession();
@@ -72,7 +70,6 @@ const Gallery = () => {
 
   const fetchPortfolios = useCallback(async () => {
     try {
-      setIsLoading(true);
       const { data, error } = await supabase
         .from('portfolios')
         .select('*')
@@ -90,8 +87,6 @@ const Gallery = () => {
     } catch (err) {
       console.error('Unexpected error fetching portfolios:', err);
       triggerErrorToast('An unexpected error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
@@ -318,7 +313,7 @@ const Gallery = () => {
   };
 
   useEffect(() => {
-    if (areAllIframesLoaded() && loggedIn) {
+    if (areAllIframesLoaded() && loggedIn && toolbarRef.current) {
       gsap.to(toolbarRef.current, {
         y: 0,
         opacity: 1,
@@ -326,7 +321,7 @@ const Gallery = () => {
         ease: "power2.out"
       });
     }
-  }, [areAllIframesLoaded, loggedIn]);
+  }, [areAllIframesLoaded, loggedIn, toolbarRef]);
 
   return (
     <>
