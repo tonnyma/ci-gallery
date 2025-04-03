@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import gsap from 'gsap';
 
 // Set GSAP defaults
 gsap.defaults({
-  ease: "power2.out",
-  duration: 0.4
+  duration: 0.5,
+  ease: "power2.out"
 });
 
 // Define a Portfolio interface for clarity
@@ -29,6 +29,7 @@ const Gallery = () => {
   const [showToastMessage, setShowToastMessage] = useState<string | null>(null);
   const [showErrorToast, setShowErrorToast] = useState<string | false>(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [iframesLoaded, setIframesLoaded] = useState<{ [key: string]: boolean }>({});
 
   // Add refs for GSAP
   const tileRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -39,17 +40,14 @@ const Gallery = () => {
   const hasAnimatedToolbar = useRef(false);
   const hasAnimatedHeader = useRef(false);
 
-  // Add iframe loading state
-  const [loadedIframes, setLoadedIframes] = useState<Record<number, boolean>>({});
-  
   // Check if all iframes are loaded
-  const areAllIframesLoaded = (portfolioIds: number[]) => {
-    return portfolioIds.length > 0 && portfolioIds.every(id => loadedIframes[id]);
-  };
+  const areAllIframesLoaded = useCallback(() => {
+    return portfolios.length > 0 && portfolios.every(portfolio => iframesLoaded[`iframe-${portfolio.id}`]);
+  }, [portfolios, iframesLoaded]);
 
   // Handle iframe load
   const handleIframeLoad = (portfolioId: number) => {
-    setLoadedIframes(prev => ({ ...prev, [portfolioId]: true }));
+    setIframesLoaded(prev => ({ ...prev, [`iframe-${portfolioId}`]: true }));
   };
 
   // Check session on mount
@@ -72,8 +70,7 @@ const Gallery = () => {
     };
   }, []);
 
-  // Fetch portfolios from Supabase
-  const fetchPortfolios = async () => {
+  const fetchPortfolios = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
@@ -96,12 +93,12 @@ const Gallery = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   // Fetch portfolios when component mounts
   useEffect(() => {
     fetchPortfolios();
-  }, []);
+  }, [fetchPortfolios]);
 
   useEffect(() => {
     console.log("Toast message:", showErrorToast);
@@ -221,7 +218,7 @@ const Gallery = () => {
   // Separate effect for header and toolbar animations
   useEffect(() => {
     if (portfolios.length > 0 && 
-        areAllIframesLoaded(portfolios.map(p => p.id))) {
+        areAllIframesLoaded()) {
       
       // Animate header if not already animated
       if (!hasAnimatedHeader.current) {
@@ -257,7 +254,7 @@ const Gallery = () => {
         );
       }
     }
-  }, [loggedIn, portfolios, loadedIframes]);
+  }, [loggedIn, portfolios, iframesLoaded]);
 
   // Handle tile hover animations
   const handleTileHover = (index: number, isEntering: boolean) => {
@@ -319,6 +316,17 @@ const Gallery = () => {
       duration: 0.3
     }, "-=0.2");
   };
+
+  useEffect(() => {
+    if (areAllIframesLoaded() && loggedIn) {
+      gsap.to(toolbarRef.current, {
+        y: 0,
+        opacity: 1,
+        duration: 0.6,
+        ease: "power2.out"
+      });
+    }
+  }, [areAllIframesLoaded, loggedIn]);
 
   return (
     <>
