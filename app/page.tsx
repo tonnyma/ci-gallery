@@ -29,13 +29,15 @@ const Gallery = () => {
   const [showToastMessage, setShowToastMessage] = useState<string | null>(null);
   const [showErrorToast, setShowErrorToast] = useState<string | false>(false);
   const [iframesLoaded, setIframesLoaded] = useState<{ [key: string]: boolean }>({});
+  const [showHeader, setShowHeader] = useState(false);
+  const headerTriggerRef = useRef<HTMLDivElement>(null);
 
   // Add refs for GSAP
   const tileRefs = useRef<(HTMLDivElement | null)[]>([]);
   const modalRef = useRef(null);
   const backdropRef = useRef(null);
   const toolbarRef = useRef(null);
-  const headerRef = useRef(null);
+  const headerRef = useRef<HTMLDivElement>(null);
   const hasAnimatedToolbar = useRef(false);
   const hasAnimatedHeader = useRef(false);
 
@@ -323,8 +325,59 @@ const Gallery = () => {
     }
   }, [areAllIframesLoaded, loggedIn, toolbarRef]);
 
+  // Handle header visibility on scroll
+  useEffect(() => {
+    let lastScrollY = window.scrollY;
+    let ticking = false;
+    
+    const handleScroll = () => {
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          if (window.scrollY > lastScrollY && showHeader) {
+            // Scrolling down, hide header
+            setShowHeader(false);
+            if (headerRef.current) {
+              gsap.to(headerRef.current, {
+                y: -100,
+                opacity: 0,
+                duration: 0.3,
+                ease: "power2.out"
+              });
+            }
+          }
+          lastScrollY = window.scrollY;
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [showHeader]);
+
+  // Show header when mouse is near top area
+  const handleHeaderTrigger = (isEntering: boolean) => {
+    setShowHeader(isEntering);
+    if (headerRef.current) {
+      gsap.to(headerRef.current, {
+        y: isEntering ? 0 : -100,
+        opacity: isEntering ? 1 : 0,
+        duration: 0.3,
+        ease: "power2.out"
+      });
+    }
+  };
+
   return (
     <>
+      <div 
+        ref={headerTriggerRef}
+        className="fixed top-0 left-0 right-0 z-40 h-8 w-full"
+        onMouseEnter={() => handleHeaderTrigger(true)}
+        onMouseLeave={() => handleHeaderTrigger(false)}
+      />
+
       {showLoginForm && (
         <div 
           ref={backdropRef}
@@ -376,8 +429,10 @@ const Gallery = () => {
       )}
       <div 
         ref={headerRef}
-        className="w-full fixed top-0 left-0 right-0 z-50 bg-[#126D8F]/30 backdrop-blur-xl border border-[rgba(100,212,164,0.07)] py-4 px-6 flex justify-between items-center shadow-lg opacity-0"
-        style={{ transform: 'translateY(-100px)' }}
+        className="w-full fixed top-0 left-0 right-0 z-50 bg-[#126D8F]/30 backdrop-blur-xl border border-[rgba(100,212,164,0.07)] py-4 px-6 flex justify-between items-center shadow-lg"
+        style={{ transform: 'translateY(-100px)', opacity: 0 }}
+        onMouseEnter={() => handleHeaderTrigger(true)}
+        onMouseLeave={() => handleHeaderTrigger(false)}
       >
         <h1 className="text-2xl font-bold text-white">Design Gallery</h1>
         {loggedIn ? (
